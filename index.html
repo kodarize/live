@@ -191,10 +191,25 @@
         canvas.addEventListener('mousemove', draw);
         canvas.addEventListener('mouseup', stopDrawing);
         canvas.addEventListener('mouseout', stopDrawing);
-        canvas.addEventListener('touchstart', startDrawing);
-        canvas.addEventListener('touchmove', draw);
-        canvas.addEventListener('touchend', stopDrawing);
-        canvas.addEventListener('touchcancel', stopDrawing);
+        canvas.addEventListener('touchstart', function(e) {
+            e.preventDefault(); // Prevent default touch behavior
+            startDrawing(e.touches[0]);
+        });
+        
+        canvas.addEventListener('touchmove', function(e) {
+            e.preventDefault(); // Prevent default touch behavior
+            draw(e.touches[0]);
+        });
+        
+        canvas.addEventListener('touchend', function(e) {
+            e.preventDefault(); // Prevent default touch behavior
+            stopDrawing();
+        });
+        
+        canvas.addEventListener('touchcancel', function(e) {
+            e.preventDefault(); // Prevent default touch behavior
+            stopDrawing();
+        });
 
         function startDrawing(e) {
             drawing = true;
