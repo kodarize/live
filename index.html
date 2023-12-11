@@ -1,0 +1,287 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Quantum Collaborator</title>
+    <style>
+        body {
+            margin: 0;
+            font-family: 'Arial', sans-serif;
+            background-color: #121212;
+            color: #fff;
+            padding: 20px;
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 20px;
+        }
+
+        h1 {
+            margin-bottom: 20px;
+        }
+
+        #editor, #canvas-container, #iframe-container {
+            width: 100%;
+            height: 70vh;
+            margin: 0 auto;
+            padding: 10px;
+            border: 1px solid #ccc;
+            background-color: #1f1f1f;
+            border-radius: 8px;
+            box-shadow: 0 2px 5px rgba(0, 0, 0, 0.1);
+            overflow: auto;
+        }
+
+        canvas {
+            border: 1px solid #ccc;
+            background-color: white;
+            border-radius: 8px;
+        }
+
+        #iframe {
+            width: 100%;
+            height: 100%;
+            border: none;
+            border-radius: 8px;
+        }
+
+        button {
+            display: block;
+            margin-top: 10px;
+            padding: 8px 16px;
+            background-color: #4caf50;
+            color: #fff;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            transition: background-color 0.3s;
+        }
+
+        button:hover {
+            background-color: #45a049;
+        }
+
+        .mode-switch {
+            display: flex;
+            align-items: center;
+            margin-bottom: 10px;
+        }
+
+        .mode-switch label {
+            margin-right: 10px;
+        }
+
+        #iframe-url {
+            width: 80%;
+            padding: 8px;
+            margin-right: 10px;
+            border: 1px solid #ccc;
+            border-radius: 4px;
+        }
+
+        .iframe-controls {
+            display: flex;
+            align-items: center;
+            margin-bottom: 10px;
+        }
+    </style>
+</head>
+<body>
+    <h1>Quantum Collaborator</h1>
+
+    <div id="editor" contenteditable="true" placeholder="Start typing..."></div>
+
+    <div id="canvas-container">
+        <div class="mode-switch">
+            <label for="pen-mode">Pen</label>
+            <input type="radio" id="pen-mode" name="draw-mode" checked>
+            <label for="eraser-mode">Eraser</label>
+            <input type="radio" id="eraser-mode" name="draw-mode">
+        </div>
+        <canvas id="canvas" width="800" height="400"></canvas>
+        <button onclick="clearCanvas()">Clear Canvas</button>
+    </div>
+
+    <div id="iframe-container">
+        <div class="iframe-controls">
+            <input type="text" id="iframe-url" placeholder="Enter URL">
+            <button onclick="loadIframe()">Load iFrame</button>
+        </div>
+        <iframe id="iframe" width="100%" height="100%" frameborder="0"></iframe>
+    </div>
+
+    <!-- Add Firebase SDK -->
+    <script type="module">
+        // Import the functions you need from the SDKs you need
+        import { initializeApp } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-app.js";
+        import { getAnalytics } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-analytics.js";
+        import { getDatabase, ref, onValue, set } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-database.js";
+
+        // Your web app's Firebase configuration
+        // For Firebase JS SDK v7.20.0 and later, measurementId is optional
+        const firebaseConfig = {
+            apiKey: "AIzaSyCsmHADL3Se_Yd-uHAxA-44l1wMWlIJQaI",
+            authDomain: "qweblive.firebaseapp.com",
+            projectId: "qweblive",
+            storageBucket: "qweblive.appspot.com",
+            messagingSenderId: "79960315444",
+            appId: "1:79960315444:web:f48bc912eae0e9d27a1c61",
+            measurementId: "G-0GPFBLT5VH",
+            databaseURL: "https://qweblive-default-rtdb.firebaseio.com/"
+        };
+
+        // Initialize Firebase
+        const app = initializeApp(firebaseConfig);
+        const analytics = getAnalytics(app);
+
+        const editor = document.getElementById('editor');
+        const canvas = document.getElementById('canvas');
+        const canvasContext = canvas.getContext('2d');
+        const iframe = document.getElementById('iframe');
+        const iframeUrlInput = document.getElementById('iframe-url');
+        const drawModePen = document.getElementById('pen-mode');
+        const db = getDatabase();
+
+        // Listen for changes in the textarea
+        editor.addEventListener('input', function() {
+            // Update the content in the database
+            set(ref(db, 'editor-content'), editor.innerHTML);
+        });
+
+        // Listen for changes from other users
+        onValue(ref(db, 'editor-content'), function(snapshot) {
+            // Update the content in the textarea
+            editor.innerHTML = snapshot.val();
+        });
+
+        // Listen for scroll changes
+        editor.addEventListener('scroll', function() {
+            // Update the scroll position in the database
+            set(ref(db, 'editor-scroll'), editor.scrollTop);
+        });
+
+        // Listen for scroll changes from other users
+        onValue(ref(db, 'editor-scroll'), function(snapshot) {
+            // Update the scroll position in the textarea
+            editor.scrollTop = snapshot.val();
+        });
+
+        // Drawing mode switch
+        const drawingMode = {
+            pen: true,
+            eraser: false
+        };
+
+        drawModePen.addEventListener('change', function() {
+            drawingMode.pen = true;
+            drawingMode.eraser = false;
+        });
+
+        const drawModeEraser = document.getElementById('eraser-mode');
+        drawModeEraser.addEventListener('change', function() {
+            drawingMode.pen = false;
+            drawingMode.eraser = true;
+        });
+
+        // Listen for canvas drawing changes
+        let drawing = false;
+        canvas.addEventListener('mousedown', startDrawing);
+        canvas.addEventListener('mousemove', draw);
+        canvas.addEventListener('mouseup', stopDrawing);
+        canvas.addEventListener('mouseout', stopDrawing);
+
+        function startDrawing(e) {
+            drawing = true;
+            draw(e);
+        }
+
+        function draw(e) {
+            if (!drawing) return;
+
+            const x = e.clientX - canvas.getBoundingClientRect().left;
+            const y = e.clientY - canvas.getBoundingClientRect().top;
+
+            canvasContext.lineWidth = drawingMode.pen ? 2 : 20;
+            canvasContext.lineCap = 'round';
+            canvasContext.strokeStyle = drawingMode.pen ? 'black' : 'white';
+
+            if (drawingMode.eraser) {
+                canvasContext.globalCompositeOperation = 'destination-out';
+            } else {
+                canvasContext.globalCompositeOperation = 'source-over';
+            }
+
+            canvasContext.lineTo(x, y);
+            canvasContext.stroke();
+            canvasContext.beginPath();
+            canvasContext.moveTo(x, y);
+
+            // Update the canvas drawing in the database
+            set(ref(db, 'canvas-drawing'), canvas.toDataURL());
+        }
+
+        function stopDrawing() {
+            drawing = false;
+            canvasContext.beginPath();
+            // Update the canvas drawing in the database
+            set(ref(db, 'canvas-drawing'), canvas.toDataURL());
+        }
+
+        // Listen for drawing changes from other users
+        onValue(ref(db, 'canvas-drawing'), function(snapshot) {
+            const img = new Image();
+            img.onload = function() {
+                canvasContext.clearRect(0, 0, canvas.width, canvas.height);
+                canvasContext.drawImage(img, 0, 0);
+            };
+            img.src = snapshot.val();
+        });
+
+        // Listen for iframe URL changes
+        iframeUrlInput.addEventListener('change', function() {
+            const url = iframeUrlInput.value;
+            // Update the URL in the database
+            set(ref(db, 'iframe-url'), url);
+        });
+
+        // Listen for iframe URL changes from other users
+        onValue(ref(db, 'iframe-url'), function(snapshot) {
+            const url = snapshot.val();
+            iframeUrlInput.value = url;
+            loadIframe();
+        });
+
+        // Listen for iframe scroll changes
+        iframe.addEventListener('load', function() {
+            // Sync initial scroll position
+            set(ref(db, 'iframe-scroll'), iframe.contentWindow.scrollY);
+
+            // Listen for scroll changes
+            iframe.contentWindow.addEventListener('scroll', function() {
+                // Update the scroll position in the database
+                set(ref(db, 'iframe-scroll'), iframe.contentWindow.scrollY);
+            });
+        });
+
+        // Listen for iframe scroll changes from other users
+        onValue(ref(db, 'iframe-scroll'), function(snapshot) {
+            // Update the scroll position in the iframe
+            iframe.contentWindow.scrollTo(0, snapshot.val());
+        });
+
+        function loadIframe() {
+            const url = iframeUrlInput.value;
+            // Update the iframe URL in the database
+            set(ref(db, 'iframe-url'), url);
+            iframe.src = url;
+        }
+
+        // Clear canvas button
+        function clearCanvas() {
+            canvasContext.clearRect(0, 0, canvas.width, canvas.height);
+            // Update the canvas drawing in the database
+            set(ref(db, 'canvas-drawing'), canvas.toDataURL());
+        }
+    </script>
+</body>
+</html>
