@@ -12,7 +12,7 @@
             color: #fff;
             padding: 20px;
             display: grid;
-            grid-template-columns: 1fr 1fr;
+            grid-template-columns: 1fr 1fr 5fr;
             gap: 20px;
         }
 
@@ -85,9 +85,10 @@
             margin-bottom: 10px;
         }
     </style>
+    <!-- Include jQuery -->
+    <script src="https://code.jquery.com/jquery-3.6.4.min.js"></script>
 </head>
 <body>
-    <h1>Quantum Collaborator</h1>
 
     <div id="editor" contenteditable="true" placeholder="Start typing..."></div>
 
@@ -99,7 +100,6 @@
             <input type="radio" id="eraser-mode" name="draw-mode">
         </div>
         <canvas id="canvas" width="800" height="400"></canvas>
-        <button onclick="clearCanvas()">Clear Canvas</button>
     </div>
 
     <div id="iframe-container">
@@ -112,6 +112,8 @@
 
     <!-- Add Firebase SDK -->
     <script type="module">
+        
+        
         // Import the functions you need from the SDKs you need
         import { initializeApp } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-app.js";
         import { getAnalytics } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-analytics.js";
@@ -189,6 +191,10 @@
         canvas.addEventListener('mousemove', draw);
         canvas.addEventListener('mouseup', stopDrawing);
         canvas.addEventListener('mouseout', stopDrawing);
+        canvas.addEventListener('touchstart', startDrawing);
+        canvas.addEventListener('touchmove', draw);
+        canvas.addEventListener('touchend', stopDrawing);
+        canvas.addEventListener('touchcancel', stopDrawing);
 
         function startDrawing(e) {
             drawing = true;
@@ -275,13 +281,28 @@
             set(ref(db, 'iframe-url'), url);
             iframe.src = url;
         }
-
-        // Clear canvas button
-        function clearCanvas() {
-            canvasContext.clearRect(0, 0, canvas.width, canvas.height);
-            // Update the canvas drawing in the database
-            set(ref(db, 'canvas-drawing'), canvas.toDataURL());
-        }
+        
+        // Your jQuery code with Firebase integration
+        $(document).ready(function() {
+            $("#editor").on("click", function() {
+                $("body").css("grid-template-columns", "5fr 1fr 1fr");
+                set(ref(db, 'layout'), '5fr 1fr 1fr');
+            });
+            $("#canvas-container").on("click", function() {
+                $("body").css("grid-template-columns", "1fr 5fr 1fr");
+                set(ref(db, 'layout'), '1fr 5fr 1fr');
+            });
+            $("#iframe-container").on("click", function() {
+                $("body").css("grid-template-columns", "1fr 1fr 5fr");
+                set(ref(db, 'layout'), '1fr 1fr 5fr');
+            });
+            
+            // Listen for changes in the layout from other users
+            onValue(ref(db, 'layout'), function(snapshot) {
+                const layout = snapshot.val();
+                $("body").css("grid-template-columns", layout);
+            });
+        });
     </script>
 </body>
 </html>
